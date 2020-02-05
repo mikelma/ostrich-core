@@ -36,15 +36,18 @@ pub enum CommandCode {
     Err = 1,
     Get = 2,
     Msg = 3,
-    Usr = 4, // User log in command
+    End = 4,
+    Usr = 5, // User log in command
 }
 
+// TODO : Descriptions
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     Ok,
     Err(String), // text (error)
     Get,
     Msg(String, String, String), // sender, receiver, text
+    End,
     Usr(String, String), // sender (username), text (password)
 }
 
@@ -87,6 +90,7 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
 
                 Ok(Command::Msg(sender.to_string(), recv.to_string(), text))
             },
+            Some(CommandCode::End) => Ok(Command::End),
             Some(CommandCode::Usr) => {
                 // Get sender's username
                 let n = raw[SENDER_LEN] as usize;
@@ -139,6 +143,7 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 RawMessage::put(&mut buffer, err, TXT_BYTES)?;
             },
             Command::Get => buffer[0] = CommandCode::Get as u8,
+            Command::End => buffer[0] = CommandCode::End as u8,
             Command::Msg(s,r,t) => {
                 // Append MSG code
                 buffer[0] = CommandCode::Msg as u8;
@@ -197,7 +202,6 @@ fn test_ok() {
     let recovered = RawMessage::from_raw(&mesg).unwrap();
     assert_eq!(mesg[0], 0);
     assert_eq!(command, recovered);
-
 }
 
 #[test]
@@ -208,7 +212,6 @@ fn test_get() {
     let recovered = RawMessage::from_raw(&mesg).unwrap();
     assert_eq!(mesg[0], 2);
     assert_eq!(command, recovered);
-
 }
 
 #[test]
@@ -235,6 +238,16 @@ fn test_msg() {
 }
 
 #[test]
+fn test_end() {
+    // Test ok command
+    let command = Command::End; 
+    let mesg = RawMessage::to_raw(&command).unwrap();
+    let recovered = RawMessage::from_raw(&mesg).unwrap();
+    assert_eq!(mesg[0], 4);
+    assert_eq!(command, recovered);
+}
+
+#[test]
 fn test_usr() {
     // Test error command
     let command = Command::Usr("sender".to_string(),
@@ -242,6 +255,6 @@ fn test_usr() {
 
     let mesg = RawMessage::to_raw(&command).unwrap();
     let recovered = RawMessage::from_raw(&mesg).unwrap();
-    assert_eq!(mesg[0], 4);
+    assert_eq!(mesg[0], 5);
     assert_eq!(command, recovered);
 }
