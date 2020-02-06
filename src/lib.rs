@@ -1,5 +1,5 @@
 use std::io;
-// use std::fmt;
+use std::fmt;
 use std::ops::Range;
 use std::convert::TryFrom;
 
@@ -49,6 +49,19 @@ pub enum Command {
     Msg(String, String, String), // sender, receiver, text
     End,
     Usr(String, String), // sender (username), text (password)
+}
+
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Command::Ok => write!(f, "OK"),
+            Command::Err(err) => write!(f, "ERROR: {}", err),
+            Command::Get => write!(f, "GET"),
+            Command::Msg(s, t, m) => write!(f, "{} -> {} : {}", s, t, m),
+            Command::End => write!(f, "END"),
+            Command::Usr(u, p) => write!(f, "USR: {}, PASWD: {}", u, p),
+        }
+    }
 }
 
 pub struct RawMessage;
