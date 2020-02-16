@@ -38,6 +38,7 @@ pub enum CommandCode {
     Msg = 3,
     End = 4,
     Usr = 5, // User log in command
+    JoinGroup = 6,
 }
 
 // TODO : Descriptions
@@ -48,7 +49,8 @@ pub enum Command {
     Get,
     Msg(String, String, String), // sender, receiver, text
     End,
-    Usr(String, String), // sender (username), text (password)
+    Usr(String, String),    // sender (username), text (password)
+    JoinGroup(String),      // group name
 }
 
 impl fmt::Display for Command {
@@ -60,6 +62,7 @@ impl fmt::Display for Command {
             Command::Msg(s, t, m) => write!(f, "{} -> {} : {}", s, t, m),
             Command::End => write!(f, "END"),
             Command::Usr(u, p) => write!(f, "USR: {}, PASWD: {}", u, p),
+            Command::JoinGroup(gname) => write!(f, "JOINGROUP: {}", gname),
         }
     }
 }
@@ -112,6 +115,14 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 let password = RawMessage::parse_text(&raw);
 
                 Ok(Command::Usr(username.to_string(), password))
+            },
+            Some(CommandCode::JoinGroup) => {
+                // Get group's name length
+                let n = raw[RECV_LEN] as usize;
+                // Transform bytes to utf-8 string
+                let gname = String::from_utf8_lossy(&raw[RECV_BYTES][..n]);
+                
+                Ok(Command::JoinGroup(gname.to_string()))
             },
             None => Err(io::Error::new(io::ErrorKind::InvalidData, 
                                        format!("Incorrect command byte: {}", raw[0]))),
@@ -188,6 +199,15 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 RawMessage::put(&mut buffer, &length, TXT_LEN)?;
                 // Set password in the text segment of the message
                 RawMessage::put(&mut buffer, password, TXT_BYTES)?;
+            },
+            Command::JoinGroup(gname) => {
+                // Set JOINGROUP command code
+                buffer[0] = CommandCode::Usr as u8;
+                // The name of the group to join is stored in the 
+                // targets space of the message
+                let gname = gname.as_bytes();
+                buffer[RECV_LEN] = gname.len() as u8; // Set sender name size
+                RawMessage::put(&mut buffer, gname, RECV_BYTES)?;
             },
         }
 
