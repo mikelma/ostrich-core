@@ -38,7 +38,7 @@ pub enum CommandCode {
     Msg = 3,
     End = 4,
     Usr = 5, // User log in command
-    JoinGroup = 6,
+    Join = 6,
 }
 
 // TODO : Descriptions
@@ -50,7 +50,7 @@ pub enum Command {
     Msg(String, String, String), // sender, receiver, text
     End,
     Usr(String, String),    // sender (username), text (password)
-    JoinGroup(String),      // group name
+    Join(String),      // group or user name
 }
 
 impl fmt::Display for Command {
@@ -62,7 +62,7 @@ impl fmt::Display for Command {
             Command::Msg(s, t, m) => write!(f, "{} -> {} : {}", s, t, m),
             Command::End => write!(f, "END"),
             Command::Usr(u, p) => write!(f, "USR: {}, PASWD: {}", u, p),
-            Command::JoinGroup(gname) => write!(f, "JOINGROUP: {}", gname),
+            Command::Join(gname) => write!(f, "JOINGROUP: {}", gname),
         }
     }
 }
@@ -116,13 +116,13 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
 
                 Ok(Command::Usr(username.to_string(), password))
             },
-            Some(CommandCode::JoinGroup) => {
+            Some(CommandCode::Join) => {
                 // Get group's name length
                 let n = raw[RECV_LEN] as usize;
                 // Transform bytes to utf-8 string
                 let gname = String::from_utf8_lossy(&raw[RECV_BYTES][..n]);
                 
-                Ok(Command::JoinGroup(gname.to_string()))
+                Ok(Command::Join(gname.to_string()))
             },
             None => Err(io::Error::new(io::ErrorKind::InvalidData, 
                                        format!("Incorrect command byte: {}", raw[0]))),
@@ -200,9 +200,9 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 // Set password in the text segment of the message
                 RawMessage::put(&mut buffer, password, TXT_BYTES)?;
             },
-            Command::JoinGroup(gname) => {
+            Command::Join(gname) => {
                 // Set JOINGROUP command code
-                buffer[0] = CommandCode::Usr as u8;
+                buffer[0] = CommandCode::Join as u8;
                 // The name of the group to join is stored in the 
                 // targets space of the message
                 let gname = gname.as_bytes();
@@ -289,5 +289,15 @@ fn test_usr() {
     let mesg = RawMessage::to_raw(&command).unwrap();
     let recovered = RawMessage::from_raw(&mesg).unwrap();
     assert_eq!(mesg[0], 5);
+    assert_eq!(command, recovered);
+}
+
+#[test]
+fn test_join() {
+    // Test error command
+    let command = Command::Join("#group_name".to_string());
+    let mesg = RawMessage::to_raw(&command).unwrap();
+    let recovered = RawMessage::from_raw(&mesg).unwrap();
+    assert_eq!(mesg[0], 6);
     assert_eq!(command, recovered);
 }
