@@ -45,12 +45,12 @@ pub enum CommandCode {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     Ok,
-    Err(String), // text (error)
+    Err(String),                 // text (error)
     Get,
     Msg(String, String, String), // sender, receiver, text
     End,
-    Usr(String, String),    // sender (username), text (password)
-    Join(String),      // group or user name
+    Usr(String, String),         // sender (username), text (password)
+    Join(String),                // group or user name
 }
 
 impl fmt::Display for Command {
