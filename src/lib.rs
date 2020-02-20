@@ -62,7 +62,7 @@ impl fmt::Display for Command {
             Command::Msg(s, t, m) => write!(f, "{} -> {} : {}", s, t, m),
             Command::End => write!(f, "END"),
             Command::Usr(u, p) => write!(f, "USR: {}, PASWD: {}", u, p),
-            Command::Join(gname) => write!(f, "JOINGROUP: {}", gname),
+            Command::Join(gname) => write!(f, "JOIN: {}", gname),
         }
     }
 }
