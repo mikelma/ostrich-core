@@ -82,7 +82,6 @@ impl RawMessage {
         range[0] = raw[TXT_LEN.start];
         range[1] = raw[TXT_LEN.end];
         let n: usize = u16::from_ne_bytes(range) as usize;
-        println!("<---- parse_text: n = {}", n);
         // Convert txt to string
         let text = String::from_utf8_lossy(&raw[TXT_BYTES][..n]);
         text.to_string()
