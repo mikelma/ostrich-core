@@ -8,8 +8,8 @@ Commands are send in 1024 byte length TCP packets and all commands share the sam
 | ------------- |:-------------:| --------------------:|
 | 0             | CMD_BYTES     | Command's ID         |
 | 1             | SENDER_LEN    | Sender's name length |
-| 2-15          | SENDER_BYES   | Sender's name        |
-| 16            | RECV_LEN      | Receiver's length    |
-| 17-31         | RECV_BYTES    | Receiver's name      |
-| 32-33         | TXT_LEN       | Text section's length|
-| 34-1023       | TXT_BYTES     | Text section         |
+| 2-17          | SENDER_BYES   | Sender's name        |
+| 18            | RECV_LEN      | Receiver's length    |
+| 19-34         | RECV_BYTES    | Receiver's name      |
+| 35-36         | TXT_LEN       | Text section's length|
+| 37-1023       | TXT_BYTES     | Text section         |

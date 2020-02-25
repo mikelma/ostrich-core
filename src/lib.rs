@@ -15,18 +15,20 @@ pub const PCK_SIZE: usize = 1024;
  *  fields sender and receiver are empty.
  *
  * 1   B : Command code (0)
- * 16  B : Sender name or empty (1-15) NOTE: First byte for text length
- * 16  B : Receiver or empty (16-31) NOTE: First byte for text length
- * 2   B : Text length in bytes (32-33)
+ * 1   B : Sender's name length
+ * 16  B : Sender name or empty
+ * 1   B : Receiver's name length
+ * 16  B : Receiver or empty
+ * 2   B : Text length in bytes
  * 991 B : Text or empty (34-1023)
  */
 pub const CMD_BYTES: Range<usize> = (0..0);
 pub const SENDER_LEN: usize = 1;
-pub const SENDER_BYTES: Range<usize> = (2..15);
-pub const RECV_LEN: usize = 16;
-pub const RECV_BYTES: Range<usize> = (17..31);
-pub const TXT_LEN: Range<usize> = (32..33);
-pub const TXT_BYTES: Range<usize> = (34..1023);
+pub const SENDER_BYTES: Range<usize> = (2..17);
+pub const RECV_LEN: usize = 18;
+pub const RECV_BYTES: Range<usize> = (19..34);
+pub const TXT_LEN: Range<usize> = (35..36);
+pub const TXT_BYTES: Range<usize> = (37..1023);
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, FromPrimitive)]
