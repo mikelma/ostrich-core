@@ -20,7 +20,7 @@ pub const PCK_SIZE: usize = 1024;
  * 1   B : Receiver's name length
  * 16  B : Receiver or empty
  * 2   B : Text length in bytes
- * 991 B : Text or empty (34-1023)
+ * 991 B : Text or empty
  */
 pub const CMD_BYTES: Range<usize> = (0..0);
 pub const SENDER_LEN: usize = 1;
@@ -82,6 +82,7 @@ impl RawMessage {
         range[0] = raw[TXT_LEN.start];
         range[1] = raw[TXT_LEN.end];
         let n: usize = u16::from_ne_bytes(range) as usize;
+        println!("<---- parse_text: n = {}", n);
         // Convert txt to string
         let text = String::from_utf8_lossy(&raw[TXT_BYTES][..n]);
         text.to_string()
