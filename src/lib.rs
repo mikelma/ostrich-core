@@ -41,6 +41,7 @@ pub enum CommandCode {
     End = 4,
     Usr = 5, // User log in command
     Join = 6,
+    Leave = 7,
 }
 
 // TODO : Descriptions
@@ -53,6 +54,7 @@ pub enum Command {
     End,
     Usr(String, String),         // sender (username), text (password)
     Join(String),                // group or user name
+    Leave(String),                // group or user name
 }
 
 impl fmt::Display for Command {
@@ -65,6 +67,7 @@ impl fmt::Display for Command {
             Command::End => write!(f, "END"),
             Command::Usr(u, p) => write!(f, "USR: {}, PASWD: {}", u, p),
             Command::Join(gname) => write!(f, "JOIN: {}", gname),
+            Command::Leave(gname) => write!(f, "LEAVE: {}", gname),
         }
     }
 }
@@ -125,6 +128,14 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 let gname = String::from_utf8_lossy(&raw[RECV_BYTES][..n]);
                 
                 Ok(Command::Join(gname.to_string()))
+            },
+            Some(CommandCode::Leave) => {
+                // Get group's name length
+                let n = raw[RECV_LEN] as usize;
+                // Transform bytes to utf-8 string
+                let gname = String::from_utf8_lossy(&raw[RECV_BYTES][..n]);
+                
+                Ok(Command::Leave(gname.to_string()))
             },
             None => Err(io::Error::new(io::ErrorKind::InvalidData, 
                                        format!("Incorrect command byte: {}", raw[0]))),
@@ -203,9 +214,18 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 RawMessage::put(&mut buffer, password, TXT_BYTES)?;
             },
             Command::Join(gname) => {
-                // Set JOINGROUP command code
+                // Set JOIN command code
                 buffer[0] = CommandCode::Join as u8;
                 // The name of the group to join is stored in the 
+                // targets space of the message
+                let gname = gname.as_bytes();
+                buffer[RECV_LEN] = gname.len() as u8; // Set sender name size
+                RawMessage::put(&mut buffer, gname, RECV_BYTES)?;
+            },
+            Command::Leave(gname) => {
+                // Set LEAVE command code
+                buffer[0] = CommandCode::Leave as u8;
+                // The name of the group to leave is stored in the 
                 // targets space of the message
                 let gname = gname.as_bytes();
                 buffer[RECV_LEN] = gname.len() as u8; // Set sender name size
@@ -301,5 +321,15 @@ fn test_join() {
     let mesg = RawMessage::to_raw(&command).unwrap();
     let recovered = RawMessage::from_raw(&mesg).unwrap();
     assert_eq!(mesg[0], 6);
+    assert_eq!(command, recovered);
+}
+
+#[test]
+fn test_leave() {
+    // Test error command
+    let command = Command::Leave("#group_name".to_string());
+    let mesg = RawMessage::to_raw(&command).unwrap();
+    let recovered = RawMessage::from_raw(&mesg).unwrap();
+    assert_eq!(mesg[0], 7);
     assert_eq!(command, recovered);
 }
