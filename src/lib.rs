@@ -65,7 +65,7 @@ pub enum Command {
     // Leave chat: group or user name
     Leave(String),                
     // List groups: Group name, msg number, total num of msgs, number of usernames, list of users
-    ListUsr(String, usize, usize, usize, Vec<String>)
+    ListUsr(String, String)
 }
 
 impl fmt::Display for Command {
@@ -79,9 +79,9 @@ impl fmt::Display for Command {
             Command::Usr(u, p) => write!(f, "USR: {}, PASWD: {}", u, p),
             Command::Join(gname) => write!(f, "JOIN: {}", gname),
             Command::Leave(gname) => write!(f, "LEAVE: {}", gname),
-            Command::ListUsr(gname, n, total, n_usr, users) => write!(
-                f, "LIST: group:{}, nº{}/{}, users({}): {:?}",
-                gname, n, total, n_usr, users),
+            Command::ListUsr(gname, users) => write!(
+                f, "LIST: group {} users: {}",
+                gname, users),
         }
     }
 }
@@ -155,29 +155,10 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 // Get group's name
                 let n = raw[SENDER_LEN] as usize;
                 let gname = String::from_utf8_lossy(&raw[SENDER_BYTES][..n]);
-                // Get message's id, strored in the byte of RECV_LEN
-                let id = raw[RECV_LEN] as usize;
-                // Get the total nmber of list messages to be sended. Number strored in the first
-                // byte of RECV_BYTES
-                let total = raw[RECV_BYTES.start] as usize;
-                // Get the number of usernames the message contains. 
-                // Stored in the first byte of TXT_LEN
-                let n_usrs = raw[TXT_LEN.start] as usize;
-                // Get the usernames inside TXT_BYTES
-                let mut users = vec![];
-                let start = TXT_BYTES.start as usize;
-                for i in 0..n_usrs {
-                    // Get the slice where the i-th username is sored
-                    let (usr_start, mut usr_end) = (start+i*16, start+i*16+16);
-                    if let Some(index) = &raw[usr_start..usr_end].iter() 
-                        .position(|&x| x == 0u8) {
-                        usr_end = usr_start + index;
-                    };
-                    // Convert to utf-8 starting
-                    let user = String::from_utf8_lossy(&raw[usr_start..usr_end]);   
-                    users.push(user.to_string());
-                }
-                Ok(Command::ListUsr(gname.to_string(), id, total, n_usrs, users))
+                // Parse the message text into a string 
+                let text = RawMessage::parse_text(&raw);
+
+                Ok(Command::ListUsr(gname.to_string(), text))
             },
             None => Err(io::Error::new(io::ErrorKind::InvalidData, 
                                        format!("Incorrect command byte: {}", raw[0]))),
@@ -279,37 +260,18 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 buffer[RECV_LEN] = gname.len() as u8; // Set sender name size
                 RawMessage::put(&mut buffer, gname, RECV_BYTES)?;
             },
-            Command::ListUsr(gname, id, total, n_usrs, users) => {
+            Command::ListUsr(gname, users) => {
                 // Set ListUsr command code
                 buffer[0] = CommandCode::ListUsr as u8;
                 // Write gname's length and gname
                 buffer[SENDER_LEN] = gname.as_bytes().len() as u8;
                 RawMessage::put(&mut buffer, gname.as_bytes(), SENDER_BYTES)?;
-
-                // Set the id, total and n_usrs variables of the message
-                if *id > 255 || *total > 255 || *n_usrs > 255 {
-                    return Err(io::Error::new(io::ErrorKind::InvalidData, 
-                            "'id', 'total' and 'n_usrs' variables cannot be greater than 255 as it must fit inside a u8"));
-                }
-                buffer[RECV_LEN] = *id as u8;
-                buffer[RECV_BYTES.start] = *total as u8;
-                buffer[TXT_LEN.start] = *n_usrs as u8;
-                // Write all usernames
-                let start = TXT_BYTES.start;
-                for (index, name) in users.iter().enumerate() {
-                    let name_bytes = name.as_bytes();
-                    // Username must fit into 16 bytes
-                    if name_bytes.len() > 16 {
-                        return Err(io::Error::new(io::ErrorKind::InvalidInput, 
-                                format!("user {}, usernames must fit into 16 bytes", name)));
-                    }
-                    // Write bytes into the buffer
-                    for (i, byte) in name_bytes.iter().enumerate() {
-                        println!("strat: {}, index: {}, i: {}, byte: {}, posi: {}",
-                            start, index, i, byte, start+index*16+i);
-                        buffer[start+index*16+i] = *byte;
-                    }
-                }
+                // Set the txt message length bytes
+                let users = users.as_bytes();
+                let n = RawMessage::compute_text_length(&users)?;
+                RawMessage::put(&mut buffer, &n, TXT_LEN)?;
+                // Add the messgase's body
+                RawMessage::put(&mut buffer, users, TXT_BYTES)?;
             },
         }
         Ok(buffer)
@@ -409,14 +371,8 @@ fn test_leave() {
 
 #[test]
 fn test_listusr() {
-    let command = Command::ListUsr("#group_name".to_string(), 3, 6, 1, vec!["some".to_string()]);
-    let mesg = RawMessage::to_raw(&command).unwrap();
-    let recovered = RawMessage::from_raw(&mesg).unwrap();
-    assert_eq!(mesg[0], 8);
-    assert_eq!(command, recovered);
-
-    let command = Command::ListUsr("#gggroup".to_string(), 201, 229, 3, 
-        vec!["bibbi".to_string(), "batbat".to_string(), "hirulau".to_string()]);
+    let command = Command::ListUsr("#group_name".to_string(), 
+        "some\nmike\nkaixo\n".to_string());
     let mesg = RawMessage::to_raw(&command).unwrap();
     let recovered = RawMessage::from_raw(&mesg).unwrap();
     assert_eq!(mesg[0], 8);
