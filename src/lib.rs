@@ -45,6 +45,12 @@ pub enum CommandCode {
     ListUsr = 8,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ListUsrOperation {
+    Add,
+    Remove,
+}
+
 // TODO : Descriptions
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
@@ -64,8 +70,8 @@ pub enum Command {
     Join(String),                
     // Leave chat: group or user name
     Leave(String),                
-    // List groups: Group name, msg number, total num of msgs, number of usernames, list of users
-    ListUsr(String, String)
+    // List groups: Group name, operation (add/remove users), strig of usernames of users
+    ListUsr(String, ListUsrOperation, String)
 }
 
 impl fmt::Display for Command {
@@ -79,9 +85,10 @@ impl fmt::Display for Command {
             Command::Usr(u, p) => write!(f, "USR: {}, PASWD: {}", u, p),
             Command::Join(gname) => write!(f, "JOIN: {}", gname),
             Command::Leave(gname) => write!(f, "LEAVE: {}", gname),
-            Command::ListUsr(gname, users) => write!(
-                f, "LIST: group {} users: {}",
-                gname, users),
+            Command::ListUsr(gname, ListUsrOperation::Add, users) => write!(f, 
+                "LIST: group {} ADD users: {}", gname, users),
+            Command::ListUsr(gname, ListUsrOperation::Remove, users) => write!(f, 
+                "LIST: group {} REMOVE users: {}", gname, users),
         }
     }
 }
@@ -155,10 +162,19 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 // Get group's name
                 let n = raw[SENDER_LEN] as usize;
                 let gname = String::from_utf8_lossy(&raw[SENDER_BYTES][..n]);
+                // Operation is stored in RECV_LEN section
+                let op = if raw[RECV_LEN] == 254 {
+                    ListUsrOperation::Add
+                } else if raw[RECV_LEN] == 0 {
+                    ListUsrOperation::Remove
+                } else {
+                    return Err(io::Error::new(io::ErrorKind::InvalidData,
+                            "ListUsr command's operation specification section corrupted"));
+                };
                 // Parse the message text into a string 
                 let text = RawMessage::parse_text(&raw);
 
-                Ok(Command::ListUsr(gname.to_string(), text))
+                Ok(Command::ListUsr(gname.to_string(), op, text))
             },
             None => Err(io::Error::new(io::ErrorKind::InvalidData, 
                                        format!("Incorrect command byte: {}", raw[0]))),
@@ -260,12 +276,17 @@ pub fn from_raw(raw: &[u8]) -> Result<Command, io::Error> {
                 buffer[RECV_LEN] = gname.len() as u8; // Set sender name size
                 RawMessage::put(&mut buffer, gname, RECV_BYTES)?;
             },
-            Command::ListUsr(gname, users) => {
+            Command::ListUsr(gname, op, users) => {
                 // Set ListUsr command code
                 buffer[0] = CommandCode::ListUsr as u8;
                 // Write gname's length and gname
                 buffer[SENDER_LEN] = gname.as_bytes().len() as u8;
                 RawMessage::put(&mut buffer, gname.as_bytes(), SENDER_BYTES)?;
+                // Write the operation type in RECV_LEN section
+                buffer[RECV_LEN] = match op {
+                    ListUsrOperation::Add => 254,
+                    ListUsrOperation::Remove => 0,
+                };
                 // Set the txt message length bytes
                 let users = users.as_bytes();
                 let n = RawMessage::compute_text_length(&users)?;
@@ -372,6 +393,7 @@ fn test_leave() {
 #[test]
 fn test_listusr() {
     let command = Command::ListUsr("#group_name".to_string(), 
+        ListUsrOperation::Add,
         "some\nmike\nkaixo\n".to_string());
     let mesg = RawMessage::to_raw(&command).unwrap();
     let recovered = RawMessage::from_raw(&mesg).unwrap();
